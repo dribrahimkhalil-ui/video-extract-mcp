@@ -38,7 +38,7 @@ Acceptance audit completed:
 | Untrusted-evidence boundary | PASS | Evidence claims are discovery-only; authorization helper is always false; captured code is never evaluated | No full parser for arbitrary binary content is included |
 | Golden TikTok model/domain fixture | PASS | Stable TikTok identity, URL↔MP4 association, claims, classification, evidence quality, routing connection, and Reference decision verified by focused tests and fixture | Fixture is synthetic metadata; no live TikTok fetch |
 | Raw preservation and provenance | PASS | Raw item IDs and SHA-256 hashes are retained; input objects are not mutated | Persistence adapter is not included |
-| Git delivery metadata | BLOCKED | Workspace has no accessible `.git`, branch, remote, or history | Do not create repository metadata during this audit |
+| Git delivery metadata | PASS | Fork branch, cohesive commit, and draft PR verified below | Local workspace still has no `.git`; publication used the authorized GitHub connector |
 
 Broad-suite failure classification (91 total):
 
@@ -81,4 +81,17 @@ Exact files changed for Foundation 01 and this audit:
 
 Known limitations and unresolved risks: the model is currently in-memory and has no durable storage adapter; source authority remains discovery-only until a separately approved verification workflow exists; arbitrary binary extraction is intentionally out of scope; and broad integration failures remain environment-dependent as classified above.
 
-Completion: **95%**. All implementation, safety, golden-fixture, and test gates passed. The remaining 5% is Git delivery metadata only: this workspace has no accessible `.git` directory, branch, remote, or history. No branch, commit, PR, merge, Foundation 02 work, Drive automation, or Windows/network configuration change was attempted.
+Publication evidence:
+
+- Repository: `dribrahimkhalil-ui/video-extract-mcp` (fork of `yanlingLabs/video-extract-mcp`)
+- Base: `main` at `d0453ea30bb093a418d9c923475112219e9644a8`
+- Branch: `codex/reference-inbox-foundation-01`
+- Cohesive Foundation 01 commit: `a2966c87b2bb0770f5d7d78acdf4352e9200cf2b`
+- Draft PR: https://github.com/dribrahimkhalil-ui/video-extract-mcp/pull/1
+- PR state: open, draft, unmerged; exactly five changed files
+- Published implementation, test, fixture, and report snapshot matched the validated local bytes at publication time.
+- Fork `main` and upstream `main` both remain at `d0453ea30bb093a418d9c923475112219e9644a8`.
+
+Report-only post-validation update: this report now records publication metadata and changes the report hash. The pre-publication report SHA-256 was `546F4B16BE71228D04B2C2F5106592F9B72A2C87BC8A4389B192CB530CE1E359`; the post-publication report SHA-256 is recorded in the final delivery response. The other four Foundation 01 file hashes are unchanged.
+
+Completion: **100%**. Foundation 01 implementation, validation, safety, integrity, and draft publication gates are complete. No merge, Foundation 02 work, Drive automation, or Windows/network configuration change was performed.
