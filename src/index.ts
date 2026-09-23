@@ -4,3 +4,5 @@ export { selectFrames, cosine, SELECTOR_VERSION } from './vision/select.js';
 export { attachTranscript } from './align.js';
 export type * from './types.js';
 export * from './referenceInbox/index.js';
+export * from './referenceInbox/driveAdapter.js';
+export * from './referenceInbox/registerMapping.js';

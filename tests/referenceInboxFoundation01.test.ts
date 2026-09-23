@@ -14,10 +14,31 @@ describe('Reference Inbox Foundation 01', () => {
   it('normalizes TikTok identity and removes tracking without losing original URL', () => {
     const id = normalizeUrl(raw[0]!.originalUrl!);
     expect(id.originalUrl).toContain('utm_source');
-    expect(id.canonicalUrl).not.toContain('utm_source');
+    expect(id.canonicalUrl).toBe('https://www.tiktok.com/@aitoolvaultly/video/7686476781809061123');
     expect(id.platform).toBe('tiktok');
+    expect(id.contentType).toBe('video');
     expect(id.contentId).toBe('7686476781809061123');
     expect(id.creator).toBe('@aitoolvaultly');
+  });
+  it('normalizes TikTok photo identity and preserves content type in the canonical URL', () => {
+    const id = normalizeUrl('https://www.tiktok.com/@sodom2030/photo/7682374742350777621?_r=1&utm_source=copy&share_item_id=7682374742350777621');
+    expect(id.platform).toBe('tiktok');
+    expect(id.creator).toBe('@sodom2030');
+    expect(id.contentType).toBe('photo');
+    expect(id.contentId).toBe('7682374742350777621');
+    expect(id.canonicalUrl).toBe('https://www.tiktok.com/@sodom2030/photo/7682374742350777621');
+    expect(normalizeUrl('https://www.tiktok.com/@sodom2030/photo/7682374742350777621?utm_medium=ios').canonicalUrl).toBe('https://www.tiktok.com/@sodom2030/photo/7682374742350777621');
+  });
+  it('keeps TikTok video/photo, creator, and content IDs distinct', () => {
+    const video = normalizeUrl('https://www.tiktok.com/@creator/video/123');
+    const photo = normalizeUrl('https://www.tiktok.com/@creator/photo/123');
+    const otherCreator = normalizeUrl('https://www.tiktok.com/@other/photo/123');
+    const otherId = normalizeUrl('https://www.tiktok.com/@creator/photo/456');
+    expect(video.canonicalUrl).not.toBe(photo.canonicalUrl);
+    expect(photo.canonicalUrl).not.toBe(otherCreator.canonicalUrl);
+    expect(photo.canonicalUrl).not.toBe(otherId.canonicalUrl);
+    const videoRecord = createReferenceRecord({ title: 'video', sourceKind: 'url', rawItems: [], url: video.originalUrl, classification: 'Other', evidenceQuality: 'low' });
+    expect(findDuplicate(photo, [videoRecord])).toBeNull();
   });
   it('creates stable, provenance-traceable records and associates URL with media', () => {
     const a = createReferenceRecord({ title: 'ChatGPT vs Claude vs Gemini', sourceKind: 'url', rawItems: raw, url: raw[0]!.originalUrl, summary: 'Different AI systems are better for different tasks.', claims: ['No universally best model'], classification: 'Knowledge', evidenceQuality: 'low-medium', capability: 'Intelligence Router/model-routing' });
