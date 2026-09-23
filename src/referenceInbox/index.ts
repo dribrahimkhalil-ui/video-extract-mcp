@@ -21,6 +21,7 @@ export interface UrlIdentity {
   originalUrl: string;
   canonicalUrl: string;
   platform: string | null;
+  contentType: string | null;
   contentId: string | null;
   creator: string | null;
   removedTrackingParameters: string[];
@@ -89,22 +90,28 @@ export function normalizeUrl(originalUrl: string): UrlIdentity {
   if (parsed.pathname === '/') parsed.pathname = '/';
   parsed.hash = '';
   const host = parsed.hostname;
-  let platform: string | null = null; let contentId: string | null = null; let creator: string | null = null;
-  const tiktok = parsed.pathname.match(/^\/@([^/]+)\/video\/(\d+)/i);
-  if (host.endsWith('tiktok.com') && tiktok) { platform = 'tiktok'; creator = tiktok[1] ? `@${tiktok[1]}` : null; contentId = tiktok[2] ?? null; }
+  let platform: string | null = null; let contentType: string | null = null; let contentId: string | null = null; let creator: string | null = null;
+  const tiktok = parsed.pathname.match(/^\/@([^/]+)\/(video|photo)\/(\d+)/i);
+  if (host.endsWith('tiktok.com') && tiktok) { platform = 'tiktok'; creator = tiktok[1] ? `@${tiktok[1]}` : null; contentType = tiktok[2]?.toLowerCase() ?? null; contentId = tiktok[3] ?? null; }
+  if (host.endsWith('tiktok.com') && tiktok) {
+    for (const [key] of [...parsed.searchParams.entries()]) {
+      if (!removedTrackingParameters.includes(key)) removedTrackingParameters.push(key);
+      parsed.searchParams.delete(key);
+    }
+  }
   const youtube = parsed.searchParams.get('v') ?? (host === 'youtu.be' ? strip(parsed.pathname) : null);
-  if (host.endsWith('youtube.com') || host === 'youtu.be') { platform = 'youtube'; contentId = youtube; }
+  if (host.endsWith('youtube.com') || host === 'youtu.be') { platform = 'youtube'; contentType = 'video'; contentId = youtube; }
   const instagram = parsed.pathname.match(/^\/(?:reel|p|tv)\/([^/]+)/i);
-  if (host.endsWith('instagram.com') && instagram) { platform = 'instagram'; contentId = instagram[1] ?? null; }
+  if (host.endsWith('instagram.com') && instagram) { platform = 'instagram'; contentType = 'post'; contentId = instagram[1] ?? null; }
   const x = parsed.pathname.match(/^\/[^/]+\/status\/(\d+)/i);
-  if ((host === 'x.com' || host.endsWith('twitter.com')) && x) { platform = 'x'; contentId = x[1] ?? null; }
-  if (host.endsWith('vimeo.com') && /^\/\d+/.test(parsed.pathname)) { platform = 'vimeo'; contentId = parsed.pathname.slice(1).split('/')[0] ?? null; }
-  return { originalUrl, canonicalUrl: parsed.toString(), platform, contentId, creator, removedTrackingParameters };
+  if ((host === 'x.com' || host.endsWith('twitter.com')) && x) { platform = 'x'; contentType = 'post'; contentId = x[1] ?? null; }
+  if (host.endsWith('vimeo.com') && /^\/\d+/.test(parsed.pathname)) { platform = 'vimeo'; contentType = 'video'; contentId = parsed.pathname.slice(1).split('/')[0] ?? null; }
+  return { originalUrl, canonicalUrl: parsed.toString(), platform, contentType, contentId, creator, removedTrackingParameters };
 }
 
 export function findDuplicate(identity: UrlIdentity, existing: ReferenceRecord[]): ReferenceRecord | null {
   return existing.find((r) => r.identity.url && (r.identity.url.originalUrl === identity.originalUrl || r.identity.url.canonicalUrl === identity.canonicalUrl ||
-    (!!identity.platform && !!identity.contentId && r.identity.url.platform === identity.platform && r.identity.url.contentId === identity.contentId))) ?? null;
+    (!!identity.platform && !!identity.contentType && !!identity.contentId && r.identity.url.platform === identity.platform && r.identity.url.contentType === identity.contentType && r.identity.url.contentId === identity.contentId))) ?? null;
 }
 
 export function createReferenceRecord(input: { title: string; sourceKind: InboxKind; rawItems: RawInboxItem[]; url?: string; summary?: string; claims?: string[]; classification: Classification; evidenceQuality: EvidenceQuality; capability?: string; decision?: Decision; now?: string }): ReferenceRecord {
