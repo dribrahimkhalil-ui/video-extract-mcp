@@ -43,6 +43,19 @@ describe('Reference Inbox Foundation 02 Drive adapter and Register preview', () 
     const changed = { ...row, Notes: 'manual note' }; expect(proposeRegisterMutation(r, changed, raw, [existing]).kind).toBe('UPDATE');
     const other = { ...r, referenceId: 'ref_other' }; const otherRow = referenceRecordToRegisterRow(other, raw); const duplicate = proposeRegisterMutation(other, otherRow, raw, [existing]); expect(duplicate.kind).toBe('DUPLICATE'); expect(duplicate.existingReferenceId).toBe(r.referenceId);
   });
+  it('reconciles an exact retry to NO-OP across internal and human-facing IDs', () => {
+    const raw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(raw); const incoming = referenceRecordToRegisterRow(r, raw);
+    const persisted = { ...incoming, 'Reference ID': 'REF-0002' };
+    const existing: ExistingRegisterRow = { rowNumber: 3, values: persisted, expectedIdentity: 'REF-0002|doc-1', driveFileId: 'doc-1' };
+    const retry = proposeRegisterMutation(r, { ...incoming, 'Reference ID': r.referenceId }, raw, [existing]);
+    expect(retry.kind).toBe('NO-OP'); expect(retry.matchedBy).toBe('drive_provenance'); expect(retry.existingReferenceId).toBe('REF-0002');
+  });
+  it('keeps a separate capture with the same semantic content as DUPLICATE', () => {
+    const firstRaw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(firstRaw); const row = referenceRecordToRegisterRow(r, firstRaw);
+    const secondDoc = { ...driveDoc, driveFileId: 'doc-2', driveUrl: 'https://drive.google.com/open?id=doc-2' };
+    const secondRaw = driveItemsToRawItems([secondDoc]).rawItems; const duplicate = proposeRegisterMutation(r, row, secondRaw, [{ rowNumber: 3, values: { ...row, 'Reference ID': 'REF-0002' }, expectedIdentity: 'REF-0002|doc-1', driveFileId: 'doc-1' }]);
+    expect(duplicate.kind).toBe('DUPLICATE'); expect(duplicate.matchedBy).toBe('canonical_url');
+  });
   it('recognizes historical IDs and canonical/platform identity as duplicates while preserving the manual ID', () => {
     const raw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(raw); const row = referenceRecordToRegisterRow(r, raw);
     const historical = { ...row, 'Reference ID': 'REF-0001', 'Canonical URL': 'https://www.tiktok.com/@aitoolvaultly/video/7686476781809061123' };

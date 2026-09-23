@@ -33,6 +33,14 @@ function rowUrlIdentity(row: RegisterRow): UrlIdentity | null {
   try { return normalizeUrl(url); } catch { return null; }
 }
 
+function mappedStateEqual(left: RegisterRow, right: RegisterRow, ignoreReferenceId = false): boolean {
+  return REGISTER_COLUMNS.every((column) => (ignoreReferenceId && column === 'Reference ID') || left[column] === right[column]);
+}
+
+function isHumanFacingReferenceId(value: string): boolean {
+  return /^REF-\d+$/i.test(value);
+}
+
 function semanticMatch(record: ReferenceRecord, candidate: ExistingRegisterRow, driveFileId: string | undefined): RegisterMutationProposal['matchedBy'] | 'conflict' | null {
   const candidateUrl = record.identity.url;
   const existingUrl = rowUrlIdentity(candidate.values);
@@ -53,8 +61,15 @@ export function proposeRegisterMutation(record: ReferenceRecord, row: RegisterRo
   if (match?.match === 'conflict') return { proposalId: stableId('proposal', identity), kind: 'CONFLICT', referenceId: record.referenceId, rowNumber: match.candidate.rowNumber, row, reason: 'existing row contains conflicting identity signals', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
   if (match?.match) {
     const candidate = match.candidate;
+    const existingUrl = rowUrlIdentity(candidate.values);
+    const candidateUrl = record.identity.url;
     const unchanged = REGISTER_COLUMNS.every((column) => candidate.values[column] === row[column]);
-    const kind: MutationKind = match.match === 'reference_id' ? (unchanged ? 'NO-OP' : 'UPDATE') : 'DUPLICATE';
+    const sameSourceState = match.match === 'drive_provenance' && existingUrl && candidateUrl && existingUrl.canonicalUrl === candidateUrl.canonicalUrl && isHumanFacingReferenceId(candidate.values['Reference ID']);
+    const kind: MutationKind = match.match === 'reference_id'
+      ? (unchanged ? 'NO-OP' : 'UPDATE')
+      : sameSourceState
+        ? (mappedStateEqual(candidate.values, row, true) ? 'NO-OP' : 'UPDATE')
+        : 'DUPLICATE';
     return { proposalId: stableId('proposal', identity), kind, referenceId: record.referenceId, rowNumber: candidate.rowNumber, row: candidate.values, reason: kind === 'NO-OP' ? 'existing mapped row is already identical' : kind === 'UPDATE' ? 'existing stable Reference ID requires mapped-field update' : `semantic duplicate matched by ${match.match}`, provenance: record.provenance.rawItemIds, requiresExplicitWrite: true, matchedBy: match.match, existingReferenceId: candidate.values['Reference ID'] };
   }
   return { proposalId: stableId('proposal', identity), kind: 'CREATE', referenceId: record.referenceId, rowNumber: null, row, reason: 'no stable Reference ID or Drive provenance match exists', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
