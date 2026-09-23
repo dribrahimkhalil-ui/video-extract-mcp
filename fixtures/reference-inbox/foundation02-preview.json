@@ -1,0 +1,25 @@
+{
+  "driveFolderId": "1Eg4t0mnW-SmvlT8LaDL7m5AyszVAk43J",
+  "registerSpreadsheetId": "15W4V64jCTsokl0GI1qOOu1Sh0yZRJ3moxOjwFxct2ds",
+  "registerTab": "Reference Register",
+  "driveInput": {
+    "fileId": "doc-1",
+    "name": "capture.md",
+    "mimeType": "application/vnd.google-apps.document",
+    "contains": ["https://www.tiktok.com/@aitoolvaultly/video/7686476781809061123", "golden-tiktok.mp4"]
+  },
+  "rawInboxItems": ["drive:doc-1", "drive:doc-1:url:0", "drive:mp4-1"],
+  "referenceRecord": {
+    "creator": "@aitoolvaultly",
+    "videoId": "7686476781809061123",
+    "decision": "Reference",
+    "processingState": "New",
+    "evidenceAuthority": "discovery"
+  },
+  "registerMutationProposal": {
+    "kind": "CREATE",
+    "requiresExplicitWrite": true,
+    "writePerformed": false,
+    "rawDriveItemsModified": false
+  }
+}
