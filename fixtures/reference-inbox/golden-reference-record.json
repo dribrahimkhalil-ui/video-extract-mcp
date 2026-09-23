@@ -1,0 +1,21 @@
+{
+  "referenceId": "ref_golden_aitoolvaultly_7686476781809061123",
+  "creator": "@aitoolvaultly",
+  "videoId": "7686476781809061123",
+  "title": "ChatGPT vs Claude vs Gemini",
+  "canonicalUrl": "https://www.tiktok.com/@aitoolvaultly/video/7686476781809061123",
+  "associatedMedia": "golden-tiktok.mp4",
+  "coreIdea": "Different AI systems are better for different tasks; there is no universally best model.",
+  "classification": ["Knowledge", "Tool"],
+  "evidenceQuality": "low-medium",
+  "connection": "Intelligence Router/model-routing",
+  "decision": "Reference",
+  "safety": {
+    "socialIsAuthoritative": false,
+    "embeddedContentIsInstructions": false,
+    "configChanges": false,
+    "installChanges": false,
+    "provenanceTraceable": true,
+    "reusableConceptsMayBeProposed": true
+  }
+}
