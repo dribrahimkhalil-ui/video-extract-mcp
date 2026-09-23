@@ -1,4 +1,4 @@
-import { stableId, type ReferenceRecord } from './index.js';
+import { normalizeUrl, stableId, type ReferenceRecord, type UrlIdentity } from './index.js';
 import type { DriveRawInboxItem } from './driveAdapter.js';
 
 export const REGISTER_COLUMNS = [
@@ -25,19 +25,38 @@ export function referenceRecordToRegisterRow(record: ReferenceRecord, rawItems: 
 
 export type MutationKind = 'CREATE' | 'UPDATE' | 'DUPLICATE' | 'NO-OP' | 'CONFLICT';
 export interface ExistingRegisterRow { rowNumber: number; values: RegisterRow; expectedIdentity: string; driveFileId?: string; contentHash?: string; }
-export interface RegisterMutationProposal { proposalId: string; kind: MutationKind; referenceId: string; rowNumber: number | null; row: RegisterRow; reason: string; provenance: string[]; requiresExplicitWrite: true; }
+export interface RegisterMutationProposal { proposalId: string; kind: MutationKind; referenceId: string; rowNumber: number | null; row: RegisterRow; reason: string; provenance: string[]; requiresExplicitWrite: true; matchedBy?: 'reference_id' | 'drive_provenance' | 'canonical_url' | 'platform_content_id'; existingReferenceId?: string; }
+
+function rowUrlIdentity(row: RegisterRow): UrlIdentity | null {
+  const url = row['Canonical URL'] !== UNKNOWN ? row['Canonical URL'] : row['Original URL'];
+  if (!url || url === UNKNOWN) return null;
+  try { return normalizeUrl(url); } catch { return null; }
+}
+
+function semanticMatch(record: ReferenceRecord, candidate: ExistingRegisterRow, driveFileId: string | undefined): RegisterMutationProposal['matchedBy'] | 'conflict' | null {
+  const candidateUrl = record.identity.url;
+  const existingUrl = rowUrlIdentity(candidate.values);
+  if (candidate.values['Reference ID'] === record.referenceId) {
+    if (candidate.expectedIdentity !== `${record.referenceId}|${driveFileId ?? ''}`) return 'conflict';
+    return 'reference_id';
+  }
+  if (driveFileId && candidate.driveFileId === driveFileId) return 'drive_provenance';
+  if (existingUrl && candidateUrl && existingUrl.canonicalUrl === candidateUrl.canonicalUrl) return 'canonical_url';
+  if (existingUrl && candidateUrl && existingUrl.platform && existingUrl.contentId && existingUrl.platform === candidateUrl.platform && existingUrl.contentId === candidateUrl.contentId) return 'platform_content_id';
+  return null;
+}
 
 export function proposeRegisterMutation(record: ReferenceRecord, row: RegisterRow, rawItems: DriveRawInboxItem[], existing: ExistingRegisterRow[] = []): RegisterMutationProposal {
   const driveId = rawItems.find((item) => item.drive)?.drive.fileId;
-  const sameReference = existing.find((candidate) => candidate.values['Reference ID'] === record.referenceId);
-  const sameDrive = driveId ? existing.find((candidate) => candidate.driveFileId === driveId) : undefined;
   const identity = `${record.referenceId}|${driveId ?? ''}`;
-  if (sameReference && sameReference.expectedIdentity !== identity) return { proposalId: stableId('proposal', identity), kind: 'CONFLICT', referenceId: record.referenceId, rowNumber: sameReference.rowNumber, row, reason: 'existing row identity differs from the expected stable provenance', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
-  if (sameReference) {
-    const unchanged = REGISTER_COLUMNS.every((column) => sameReference.values[column] === row[column]);
-    return { proposalId: stableId('proposal', identity), kind: unchanged ? 'NO-OP' : 'UPDATE', referenceId: record.referenceId, rowNumber: sameReference.rowNumber, row, reason: unchanged ? 'existing mapped row is already identical' : 'existing stable Reference ID requires mapped-field update', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
+  const match = existing.map((candidate) => ({ candidate, match: semanticMatch(record, candidate, driveId) })).find((entry) => entry.match);
+  if (match?.match === 'conflict') return { proposalId: stableId('proposal', identity), kind: 'CONFLICT', referenceId: record.referenceId, rowNumber: match.candidate.rowNumber, row, reason: 'existing row contains conflicting identity signals', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
+  if (match?.match) {
+    const candidate = match.candidate;
+    const unchanged = REGISTER_COLUMNS.every((column) => candidate.values[column] === row[column]);
+    const kind: MutationKind = match.match === 'reference_id' ? (unchanged ? 'NO-OP' : 'UPDATE') : 'DUPLICATE';
+    return { proposalId: stableId('proposal', identity), kind, referenceId: record.referenceId, rowNumber: candidate.rowNumber, row: candidate.values, reason: kind === 'NO-OP' ? 'existing mapped row is already identical' : kind === 'UPDATE' ? 'existing stable Reference ID requires mapped-field update' : `semantic duplicate matched by ${match.match}`, provenance: record.provenance.rawItemIds, requiresExplicitWrite: true, matchedBy: match.match, existingReferenceId: candidate.values['Reference ID'] };
   }
-  if (sameDrive) return { proposalId: stableId('proposal', identity), kind: 'DUPLICATE', referenceId: record.referenceId, rowNumber: sameDrive.rowNumber, row, reason: 'Drive provenance already exists under another Reference ID', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
   return { proposalId: stableId('proposal', identity), kind: 'CREATE', referenceId: record.referenceId, rowNumber: null, row, reason: 'no stable Reference ID or Drive provenance match exists', provenance: record.provenance.rawItemIds, requiresExplicitWrite: true };
 }
 

@@ -41,7 +41,26 @@ describe('Reference Inbox Foundation 02 Drive adapter and Register preview', () 
     const existing: ExistingRegisterRow = { rowNumber: 2, values: row, expectedIdentity: `${r.referenceId}|doc-1`, driveFileId: 'doc-1' };
     expect(proposeRegisterMutation(r, row, raw, [existing]).kind).toBe('NO-OP');
     const changed = { ...row, Notes: 'manual note' }; expect(proposeRegisterMutation(r, changed, raw, [existing]).kind).toBe('UPDATE');
-    const other = { ...r, referenceId: 'ref_other' }; const otherRow = referenceRecordToRegisterRow(other, raw); expect(proposeRegisterMutation(other, otherRow, raw, [existing]).kind).toBe('DUPLICATE');
+    const other = { ...r, referenceId: 'ref_other' }; const otherRow = referenceRecordToRegisterRow(other, raw); const duplicate = proposeRegisterMutation(other, otherRow, raw, [existing]); expect(duplicate.kind).toBe('DUPLICATE'); expect(duplicate.existingReferenceId).toBe(r.referenceId);
+  });
+  it('recognizes historical IDs and canonical/platform identity as duplicates while preserving the manual ID', () => {
+    const raw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(raw); const row = referenceRecordToRegisterRow(r, raw);
+    const historical = { ...row, 'Reference ID': 'REF-0001', 'Canonical URL': 'https://www.tiktok.com/@aitoolvaultly/video/7686476781809061123' };
+    const existing: ExistingRegisterRow = { rowNumber: 2, values: historical, expectedIdentity: 'REF-0001|legacy-doc', driveFileId: 'legacy-doc' };
+    const proposal = proposeRegisterMutation(r, row, raw, [existing]);
+    expect(proposal.kind).toBe('DUPLICATE'); expect(proposal.matchedBy).toBe('canonical_url'); expect(proposal.existingReferenceId).toBe('REF-0001'); expect(proposal.row['Reference ID']).toBe('REF-0001');
+  });
+  it('recognizes platform/content ID duplicates and rejects conflicting identity signals', () => {
+    const raw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(raw); const row = referenceRecordToRegisterRow(r, raw);
+    const idRow = { ...row, 'Reference ID': 'REF-MANUAL', 'Canonical URL': 'https://www.tiktok.com/@other/video/7686476781809061123' };
+    const idMatch = proposeRegisterMutation(r, row, raw, [{ rowNumber: 2, values: idRow, expectedIdentity: 'REF-MANUAL|x' }]); expect(idMatch.kind).toBe('DUPLICATE'); expect(idMatch.matchedBy).toBe('platform_content_id');
+    const conflictRow = { ...row, 'Reference ID': r.referenceId, 'Canonical URL': 'https://www.tiktok.com/@aitoolvaultly/video/9999999999999999999' };
+    const conflict = proposeRegisterMutation(r, row, raw, [{ rowNumber: 3, values: conflictRow, expectedIdentity: 'wrong|x' }]); expect(conflict.kind).toBe('CONFLICT');
+  });
+  it('does not merge same creators, different videos, or similar filenames without identity support', () => {
+    const raw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(raw); const row = referenceRecordToRegisterRow(r, raw);
+    const different = { ...row, 'Reference ID': 'REF-OTHER', 'Canonical URL': 'https://www.tiktok.com/@aitoolvaultly/video/9999999999999999999', 'Raw Inbox Item': 'similar_7686476781809061123.mp4' };
+    expect(proposeRegisterMutation(r, row, raw, [{ rowNumber: 4, values: different, expectedIdentity: 'REF-OTHER|other' }]).kind).toBe('CREATE');
   });
   it('stops ambiguous identity conflicts and requires per-operation explicit write authorization', () => {
     const raw = driveItemsToRawItems([driveDoc]).rawItems; const r = record(raw); const row = referenceRecordToRegisterRow(r, raw);
